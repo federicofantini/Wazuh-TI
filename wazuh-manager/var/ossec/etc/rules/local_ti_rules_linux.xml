@@ -1,0 +1,191 @@
+<!--
+  local_rules.xml - Threat Intel matches (updated for Suricata)
+
+  Lists expected in /var/ossec/etc/lists/:
+    - threatview_cs_c2
+    - threatfox_ip
+    - threatfox_domain
+    - et_compromised_ips
+    - et_ciarmy
+    - et_drop
+    - et_tor
+    - et_dshield
+
+  Notes:
+    - In <list> we reference the list name WITHOUT ".list".
+    - These rules match Suricata EVE JSON fields as decoded by Wazuh.
+-->
+
+<group name="local,threat_intel,linux,suricata,">
+  <!-- ========= Outbound (dest_ip) ========= -->
+  <!-- We treat "outbound" as connections from this host to external destinations.
+      Suricata events generally provide src/dest IPs. -->
+
+
+  <!-- Noisy reduction -->
+  <rule id="1200" level="0">
+    <if_group>suricata</if_group>
+    <match>ET INFO Session Traversal Utilities for NAT</match>
+    <description>Tuning: ignore noisy STUN (ET INFO) from Suricata</description>
+  </rule>
+
+  <rule id="1201" level="0">
+    <if_group>suricata</if_group>
+    <match>ET INFO Session Traversal Utilities for NAT (STUN Binding Request)</match>
+    <description>Tuning: ignore noisy STUN (ET INFO) from Suricata</description>
+  </rule>
+
+  <rule id="1202" level="0">
+    <if_group>suricata</if_group>
+    <match>ET DOS Possible SSDP Amplification Scan in Progress</match>
+    <description>Tuning: ignore noisy SSDP Amplification (ET DOS) from Suricata</description>
+  </rule>
+
+  <rule id="1203" level="0">
+    <if_group>suricata</if_group>
+    <match>SURICATA IPv4 wrong IP version</match>
+    <description>Tuning: ignore noisy IPv4 wrong IP from Suricata</description>
+  </rule>
+
+  <rule id="1204" level="0">
+    <if_group>suricata</if_group>
+    <match>SURICATA AF-PACKET truncated packet</match>
+    <description>Tuning: ignore noisy AF-PACKET truncated packet from Suricata</description>
+  </rule>
+
+  <rule id="1205" level="0">
+    <if_group>suricata</if_group>
+    <match>SURICATA IPv4 truncated packet</match>
+    <description>Tuning: ignore noisy IPv4 truncated packet from Suricata</description>
+  </rule>
+
+  <!-- High-confidence Cobalt Strike C2 (very high severity) -->
+  <rule id="1251" level="16">
+    <if_group>suricata</if_group>
+    <list field="dest_ip" lookup="match_key">etc/lists/threatview_cs_c2</list>
+    <description>TI hit: outbound destination IP matches Threatview High-Confidence Cobalt Strike C2</description>
+    <mitre>
+      <id>T1071</id>
+    </mitre>
+  </rule>
+
+  <!-- EmergingThreats compromised IPs (medium/high) -->
+  <rule id="1252" level="11">
+    <if_group>suricata</if_group>
+    <list field="dest_ip" lookup="match_key">etc/lists/et_compromised_ips</list>
+    <description>TI hit: outbound destination IP matches ET compromised-ips</description>
+  </rule>
+
+  <!-- ThreatFox IPs (medium) -->
+  <rule id="1253" level="16">
+    <if_group>suricata</if_group>
+    <list field="dest_ip" lookup="match_key">etc/lists/threatfox_ip</list>
+    <description>TI hit: outbound destination IP matches ThreatFox IOC</description>
+  </rule>
+
+  <!-- ET DROP / CIARMY / DSHIELD / TOR (tune levels as you like) -->
+  <rule id="1254" level="10">
+    <if_group>suricata</if_group>
+    <list field="dest_ip" lookup="match_key">etc/lists/et_drop</list>
+    <description>TI hit: outbound destination IP matches ET DROP</description>
+  </rule>
+
+  <rule id="1255" level="9">
+    <if_group>suricata</if_group>
+    <list field="dest_ip" lookup="match_key">etc/lists/et_ciarmy</list>
+    <description>TI hit: outbound destination IP matches ET CIARMY</description>
+  </rule>
+
+  <rule id="1256" level="8">
+    <if_group>suricata</if_group>
+    <list field="dest_ip" lookup="match_key">etc/lists/et_dshield</list>
+    <description>TI hit: outbound destination IP matches ET DShield</description>
+  </rule>
+
+  <rule id="1257" level="7">
+    <if_group>suricata</if_group>
+    <list field="dest_ip" lookup="match_key">etc/lists/et_tor</list>
+    <description>TI hit: outbound destination IP matches ET TOR</description>
+  </rule>
+
+  <rule id="1258" level="0">
+    <if_sid>1257</if_sid>
+    <field name="dest_port">22067</field>
+    <description>TI hit: outbound destination IP matches ET TOR (no syncthing)</description>
+  </rule>
+
+  <!-- ========= Inbound (src_ip) ========= -->
+  <!-- Useful for scans/bruteforce/web probing etc.
+      In Suricata, src_ip is the remote source in inbound scenarios. -->
+
+  <rule id="1259" level="10">
+    <if_group>suricata</if_group>
+    <list field="src_ip" lookup="match_key">etc/lists/et_compromised_ips</list>
+    <description>TI hit: source IP matches ET compromised-ips</description>
+  </rule>
+
+  <rule id="1260" level="16">
+    <if_group>suricata</if_group>
+    <list field="src_ip" lookup="match_key">etc/lists/threatfox_ip</list>
+    <description>TI hit: source IP matches ThreatFox IOC</description>
+  </rule>
+
+  <rule id="1261" level="9">
+    <if_group>suricata</if_group>
+    <list field="src_ip" lookup="match_key">etc/lists/et_drop</list>
+    <description>TI hit: source IP matches ET DROP</description>
+  </rule>
+
+  <rule id="1262" level="8">
+    <if_group>suricata</if_group>
+    <list field="src_ip" lookup="match_key">etc/lists/et_ciarmy</list>
+    <description>TI hit: source IP matches ET CIARMY</description>
+  </rule>
+
+  <rule id="1263" level="7">
+    <if_group>suricata</if_group>
+    <list field="src_ip" lookup="match_key">etc/lists/et_dshield</list>
+    <description>TI hit: source IP matches ET DShield</description>
+  </rule>
+
+  <rule id="1264" level="6">
+    <if_group>suricata</if_group>
+    <list field="src_ip" lookup="match_key">etc/lists/et_tor</list>
+    <description>TI hit: source IP matches ET TOR</description>
+  </rule>
+
+  <rule id="1265" level="0">
+    <if_sid>1264</if_sid>
+    <field name="src_port">22067</field>
+    <description>TI hit: source IP matches ET TOR (no syncthing)</description>
+  </rule>
+
+  <!-- ========= Domains / URLs ========= -->
+  <!-- In Suricata EVE JSON, domains can appear in different places:
+      - DNS: dns.rrname
+      - TLS: tls.sni
+      - HTTP: http.hostname
+      We keep multiple rules so at least one matches your traffic. -->
+
+  <!-- DNS query -->
+  <rule id="1266" level="16">
+    <if_group>suricata</if_group>
+    <list field="dns.rrname" lookup="match_key">etc/lists/threatfox_domain</list>
+    <description>TI hit: DNS query matches ThreatFox domain IOC</description>
+  </rule>
+
+  <!-- TLS SNI -->
+  <rule id="1267" level="16">
+    <if_group>suricata</if_group>
+    <list field="tls.sni" lookup="match_key">etc/lists/threatfox_domain</list>
+    <description>TI hit: TLS SNI matches ThreatFox domain IOC</description>
+  </rule>
+
+  <!-- HTTP Host header -->
+  <rule id="1268" level="16">
+    <if_group>suricata</if_group>
+    <list field="http.hostname" lookup="match_key">etc/lists/threatfox_domain</list>
+    <description>TI hit: HTTP hostname matches ThreatFox domain IOC</description>
+  </rule>
+
+</group>

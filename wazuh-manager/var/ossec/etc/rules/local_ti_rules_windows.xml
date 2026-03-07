@@ -1,0 +1,137 @@
+<!--
+  local_rules.xml - Threat Intel matches
+
+  Lists expected in /var/ossec/etc/lists/:
+    - threatview_cs_c2
+    - threatfox_ip
+    - threatfox_domain
+    - et_compromised_ips
+    - et_ciarmy
+    - et_drop
+    - et_tor
+    - et_dshield
+
+  Notes:
+    - In <list> we reference the list name WITHOUT ".list".
+-->
+
+<group name="local,threat_intel,windows,sysmon,">
+  <!-- ========= Outbound (DestinationIp) ========= -->
+  <!-- Sysmon EventID 3: Network connection -->
+
+  <!-- Noisy reduction -->
+  <!-- ... -->
+
+  <!-- High-confidence Cobalt Strike C2 (very high severity) -->
+  <rule id="1150" level="16">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.DestinationIp" lookup="match_key">etc/lists/threatview_cs_c2</list>
+    <description>TI hit (Sysmon): outbound destination IP matches Threatview High-Confidence Cobalt Strike C2</description>
+    <mitre>
+      <id>T1071</id>
+    </mitre>
+  </rule>
+
+  <!-- EmergingThreats compromised IPs (medium/high) -->
+  <rule id="1151" level="11">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.DestinationIp" lookup="match_key">etc/lists/et_compromised_ips</list>
+    <description>TI hit (Sysmon): outbound destination IP matches ET compromised-ips</description>
+  </rule>
+
+  <!-- ThreatFox IPs (medium/high) -->
+  <rule id="1152" level="16">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.DestinationIp" lookup="match_key">etc/lists/threatfox_ip</list>
+    <description>TI hit (Sysmon): outbound destination IP matches ThreatFox IOC</description>
+  </rule>
+
+  <!-- ET DROP / CIARMY / DSHIELD / TOR -->
+  <rule id="1153" level="10">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.DestinationIp" lookup="match_key">etc/lists/et_drop</list>
+    <description>TI hit (Sysmon): outbound destination IP matches ET DROP</description>
+  </rule>
+
+  <rule id="1154" level="9">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.DestinationIp" lookup="match_key">etc/lists/et_ciarmy</list>
+    <description>TI hit (Sysmon): outbound destination IP matches ET CIARMY</description>
+  </rule>
+
+  <rule id="1155" level="8">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.DestinationIp" lookup="match_key">etc/lists/et_dshield</list>
+    <description>TI hit (Sysmon): outbound destination IP matches ET DShield</description>
+  </rule>
+
+  <rule id="1156" level="7">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.DestinationIp" lookup="match_key">etc/lists/et_tor</list>
+    <description>TI hit (Sysmon): outbound destination IP matches ET TOR</description>
+  </rule>
+
+
+  <!-- ========= Inbound (SourceIp) ========= -->
+  <!-- Sysmon EventID 3: Network connection (remote source IP) -->
+
+  <rule id="1157" level="10">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.SourceIp" lookup="match_key">etc/lists/et_compromised_ips</list>
+    <description>TI hit (Sysmon): source IP matches ET compromised-ips</description>
+  </rule>
+
+  <rule id="1158" level="16">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.SourceIp" lookup="match_key">etc/lists/threatfox_ip</list>
+    <description>TI hit (Sysmon): source IP matches ThreatFox IOC</description>
+  </rule>
+
+  <rule id="1159" level="9">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.SourceIp" lookup="match_key">etc/lists/et_drop</list>
+    <description>TI hit (Sysmon): source IP matches ET DROP</description>
+  </rule>
+
+  <rule id="1160" level="8">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.SourceIp" lookup="match_key">etc/lists/et_ciarmy</list>
+    <description>TI hit (Sysmon): source IP matches ET CIARMY</description>
+  </rule>
+
+  <rule id="1161" level="7">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.SourceIp" lookup="match_key">etc/lists/et_dshield</list>
+    <description>TI hit (Sysmon): source IP matches ET DShield</description>
+  </rule>
+
+  <rule id="1162" level="6">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">3</field>
+    <list field="win.eventdata.SourceIp" lookup="match_key">etc/lists/et_tor</list>
+    <description>TI hit (Sysmon): source IP matches ET TOR</description>
+  </rule>
+
+
+  <!-- ========= Domains / URLs ========= -->
+  <!-- Sysmon EventID 22: DNS query -->
+
+  <rule id="1163" level="16">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">22</field>
+    <list field="win.eventdata.QueryName" lookup="match_key">etc/lists/threatfox_domain</list>
+    <description>TI hit (Sysmon): DNS query matches ThreatFox domain IOC</description>
+  </rule>
+</group>
