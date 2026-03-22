@@ -2,7 +2,7 @@
 
 ## 0. Reference
 
-This repository serves as supplementary material for this blog post: https://blog.federicofantini.net
+This repository serves as supplementary material for this blog post: https://blog.federicofantini.net/blog/2026/03/23/Wauh-Threat-Intelligence.html
 
 ## 1. Overview
 
