@@ -17,10 +17,6 @@
 -->
 
 <group name="local,threat_intel,linux,suricata,">
-  <!-- ========= Outbound (dest_ip) ========= -->
-  <!-- We treat "outbound" as connections from this host to external destinations.
-      Suricata events generally provide src/dest IPs. -->
-
 
   <!-- Noisy reduction -->
   <rule id="1200" level="0">
@@ -58,6 +54,10 @@
     <match>SURICATA IPv4 truncated packet</match>
     <description>Tuning: ignore noisy IPv4 truncated packet from Suricata</description>
   </rule>
+
+  <!-- ========= Outbound (dest_ip) ========= -->
+  <!-- We treat "outbound" as connections from this host to external destinations.
+      Suricata events generally provide src/dest IPs. -->
 
   <!-- High-confidence Cobalt Strike C2 (very high severity) -->
   <rule id="1251" level="16">

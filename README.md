@@ -163,6 +163,154 @@ This ensures:
 - CDB lists are compiled
 - Detection becomes active
 
+### 2.7 OpenCTI Integration
+
+This alternative integration exports OpenCTI TAXII indicators into Wazuh CDB lists.
+
+Generated lists:
+
+```text
+opencti_ips
+opencti_domains
+opencti_file_hashes
+```
+
+Final Wazuh destination:
+
+```text
+/var/ossec/etc/lists/
+```
+
+#### Install the OpenCTI fetch user
+
+Create a dedicated unprivileged user:
+
+```bash
+sudo adduser --disabled-password --gecos "" opencti-ti
+
+sudo -u opencti-ti mkdir -p /home/opencti-ti/bin
+sudo -u opencti-ti mkdir -p /home/opencti-ti/iocs
+sudo -u opencti-ti mkdir -p /home/opencti-ti/logs
+```
+
+Copy the fetch script:
+
+```bash
+sudo cp wazuh-manager/usr/local/bin/fetch_opencti_iocs.py /home/opencti-ti/bin/fetch_opencti_iocs.py
+sudo chown opencti-ti:opencti-ti /home/opencti-ti/bin/fetch_opencti_iocs.py
+sudo chmod 750 /home/opencti-ti/bin/fetch_opencti_iocs.py
+```
+
+At a minimum, configure the essential global variables in the script:
+
+```python
+TAXII_URL = "..."
+OUTPUT_DIR = "/home/opencti-ti/iocs"
+TRANCO_DIR = "/home/opencti-ti/bin"
+```
+
+The script extracts IPs, domains/hostnames/URL-hosts, and file hashes, applies Tranco-based filtering to the domain list, and writes the resulting indicators into the three Wazuh CDB list files.
+
+Test it manually:
+
+```bash
+sudo -u opencti-ti /usr/bin/python3 /home/opencti-ti/bin/fetch_opencti_iocs.py
+sudo -u opencti-ti ls -lh /home/opencti-ti/iocs/
+```
+
+#### Schedule OpenCTI updates
+
+Edit the `opencti-ti` crontab:
+
+```bash
+sudo crontab -u opencti-ti -e
+```
+
+Run the fetch every day:
+
+```cron
+0 3 * * * /usr/bin/python3 /home/opencti-ti/bin/fetch_opencti_iocs.py >> /home/opencti-ti/logs/fetch_opencti_iocs.log 2>&1
+```
+
+Configure log rotation:
+
+```bash
+sudo tee /etc/logrotate.d/opencti-ti >/dev/null <<'EOF'
+/home/opencti-ti/logs/fetch_opencti_iocs.log {
+    size 10M
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su opencti-ti opencti-ti
+}
+EOF
+
+sudo -u opencti-ti touch /home/opencti-ti/logs/fetch_opencti_iocs.log
+```
+
+#### Copy lists into Wazuh
+
+Add a root cron job on the Wazuh Manager:
+
+```bash
+sudo crontab -e
+```
+
+Copy the generated files into Wazuh and restart the manager:
+
+```cron
+30 3,21 * * * cp /home/opencti-ti/iocs/opencti_ips /home/opencti-ti/iocs/opencti_domains /home/opencti-ti/iocs/opencti_file_hashes /var/ossec/etc/lists/ && chown wazuh:wazuh /var/ossec/etc/lists/opencti_ips /var/ossec/etc/lists/opencti_domains /var/ossec/etc/lists/opencti_file_hashes && chmod 640 /var/ossec/etc/lists/opencti_ips /var/ossec/etc/lists/opencti_domains /var/ossec/etc/lists/opencti_file_hashes && systemctl restart wazuh-manager
+```
+
+#### Register the CDB lists
+
+Add the lists to the `<ruleset>` section in `/var/ossec/etc/ossec.conf`:
+
+```xml
+<list>etc/lists/opencti_ips</list>
+<list>etc/lists/opencti_domains</list>
+<list>etc/lists/opencti_file_hashes</list>
+```
+
+#### Install OpenCTI rules
+
+Copy:
+
+```
+wazuh-manager/var/ossec/etc/rules/local_ti_rules_opencti_linux.xml
+wazuh-manager/var/ossec/etc/rules/local_ti_rules_opencti_windows.xml
+```
+
+To:
+
+```
+/var/ossec/etc/rules/
+```
+
+Verify permissions:
+
+```bash
+chown wazuh:wazuh /var/ossec/etc/rules/local_ti_rules_*.xml
+```
+
+Restart the manager:
+```bash
+sudo systemctl restart wazuh-manager
+```
+
+#### Verify
+
+```bash
+sudo -u opencti-ti ls -lh /home/opencti-ti/iocs/
+sudo ls -lh /var/ossec/etc/lists/opencti_*
+sudo ls -lh /var/ossec/etc/lists/opencti_*.cdb
+sudo systemctl status wazuh-manager
+sudo /var/ossec/bin/wazuh-logtest
+```
+
 ---
 
 ## 3. Linux Agent Setup (Suricata + Wazuh Agent)

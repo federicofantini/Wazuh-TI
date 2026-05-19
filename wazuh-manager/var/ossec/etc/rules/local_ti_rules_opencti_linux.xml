@@ -1,0 +1,99 @@
+<!--
+  local_rules.xml - Threat Intel matches (updated for Suricata)
+
+  Lists expected in /var/ossec/etc/lists/:
+    - opencti_ips
+    - opencti_domains
+    - opencti_file_hashes
+
+  Notes:
+    - In <list> we reference the list name WITHOUT ".list".
+    - These rules match Suricata EVE JSON fields as decoded by Wazuh.
+-->
+
+<group name="local,threat_intel,linux,suricata,">
+
+  <!-- Noisy reduction -->
+  <rule id="1400" level="0">
+    <if_group>suricata</if_group>
+    <match>ET INFO Session Traversal Utilities for NAT</match>
+    <description>Tuning: ignore noisy STUN (ET INFO) from Suricata</description>
+  </rule>
+
+  <rule id="1401" level="0">
+    <if_group>suricata</if_group>
+    <match>ET INFO Session Traversal Utilities for NAT (STUN Binding Request)</match>
+    <description>Tuning: ignore noisy STUN (ET INFO) from Suricata</description>
+  </rule>
+
+  <rule id="1402" level="0">
+    <if_group>suricata</if_group>
+    <match>ET DOS Possible SSDP Amplification Scan in Progress</match>
+    <description>Tuning: ignore noisy SSDP Amplification (ET DOS) from Suricata</description>
+  </rule>
+
+  <rule id="1403" level="0">
+    <if_group>suricata</if_group>
+    <match>SURICATA IPv4 wrong IP version</match>
+    <description>Tuning: ignore noisy IPv4 wrong IP from Suricata</description>
+  </rule>
+
+  <rule id="1404" level="0">
+    <if_group>suricata</if_group>
+    <match>SURICATA AF-PACKET truncated packet</match>
+    <description>Tuning: ignore noisy AF-PACKET truncated packet from Suricata</description>
+  </rule>
+
+  <rule id="1405" level="0">
+    <if_group>suricata</if_group>
+    <match>SURICATA IPv4 truncated packet</match>
+    <description>Tuning: ignore noisy IPv4 truncated packet from Suricata</description>
+  </rule>
+
+  <!-- ========= Outbound (dest_ip) ========= -->
+  <!-- We treat "outbound" as connections from this host to external destinations.
+      Suricata events generally provide src/dest IPs. -->
+  <rule id="1450" level="16">
+    <if_group>suricata</if_group>
+    <list field="dest_ip" lookup="match_key">etc/lists/opencti_ips</list>
+    <description>TI hit: outbound destination IP matches OpenCTI IOC</description>
+  </rule>
+
+  <!-- ========= Inbound (src_ip) ========= -->
+  <!-- Useful for scans/bruteforce/web probing etc.
+      In Suricata, src_ip is the remote source in inbound scenarios. -->
+
+  <rule id="1451" level="10">
+    <if_group>suricata</if_group>
+    <list field="src_ip" lookup="match_key">etc/lists/opencti_ips</list>
+    <description>TI hit: source IP matches OpenCTI IOC</description>
+
+  <!-- ========= Domains / URLs ========= -->
+  <!-- In Suricata EVE JSON, domains can appear in different places:
+      - DNS: dns.rrname
+      - TLS: tls.sni
+      - HTTP: http.hostname
+      We keep multiple rules so at least one matches your traffic. -->
+
+  <!-- DNS query -->
+  <rule id="1452" level="16">
+    <if_group>suricata</if_group>
+    <list field="dns.rrname" lookup="match_key">etc/lists/opencti_domains</list>
+    <description>TI hit: DNS query matches OpenCTI IOC</description>
+  </rule>
+
+  <!-- TLS SNI -->
+  <rule id="1453" level="16">
+    <if_group>suricata</if_group>
+    <list field="tls.sni" lookup="match_key">etc/lists/opencti_domains</list>
+    <description>TI hit: TLS SNI matches OpenCTI IOC</description>
+  </rule>
+
+  <!-- HTTP Host header -->
+  <rule id="1454" level="16">
+    <if_group>suricata</if_group>
+    <list field="http.hostname" lookup="match_key">etc/lists/opencti_domains</list>
+    <description>TI hit: HTTP hostname matches OpenCTI IOC</description>
+  </rule>
+
+</group>
