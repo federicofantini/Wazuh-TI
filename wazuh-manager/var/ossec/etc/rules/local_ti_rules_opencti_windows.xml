@@ -11,6 +11,7 @@
     - Sysmon EventID 3 covers network connections.
     - Sysmon EventID 22 covers DNS queries.
     - Sysmon EventID 1 and 15 can be useful for file hash matches.
+    - Sysmon start SID: https://documentation.wazuh.com/current/user-manual/capabilities/log-data-collection/configuration.html#windows-event-channel-ruleset
 -->
 
 <group name="local,threat_intel,windows,sysmon,">
@@ -19,8 +20,8 @@
   <!-- Sysmon EventID 3: Network connection -->
 
   <rule id="1301" level="16">
-    <if_group>windows</if_group>
-    <field name="win.system.eventID">3</field>
+    <if_sid>61600</if_sid>
+    <field name="win.system.eventID">^3$</field>
     <list field="win.eventdata.DestinationIp" lookup="match_key">etc/lists/opencti_ips</list>
     <description>TI hit (Sysmon): outbound destination IP matches OpenCTI IOC</description>
   </rule>
@@ -30,8 +31,8 @@
   <!-- Sysmon EventID 3: Network connection -->
 
   <rule id="1302" level="16">
-    <if_group>windows</if_group>
-    <field name="win.system.eventID">3</field>
+    <if_sid>61600</if_sid>
+    <field name="win.system.eventID">^3$</field>
     <list field="win.eventdata.SourceIp" lookup="match_key">etc/lists/opencti_ips</list>
     <description>TI hit (Sysmon): source IP matches OpenCTI IOC</description>
   </rule>
@@ -41,8 +42,8 @@
   <!-- Sysmon EventID 22: DNS query -->
 
   <rule id="1303" level="16">
-    <if_group>windows</if_group>
-    <field name="win.system.eventID">22</field>
+    <if_sid>61600</if_sid>
+    <field name="win.system.eventID">^22$</field>
     <list field="win.eventdata.QueryName" lookup="match_key">etc/lists/opencti_domains</list>
     <description>TI hit (Sysmon): DNS query matches OpenCTI IOC</description>
   </rule>
@@ -52,8 +53,8 @@
   <!-- Sysmon EventID 1: Process Create -->
 
   <rule id="1304" level="16">
-    <if_group>windows</if_group>
-    <field name="win.system.eventID">1</field>
+    <if_sid>61600</if_sid>
+    <field name="win.system.eventID">^1$</field>
     <list field="win.eventdata.Hashes" lookup="address_match_key">etc/lists/opencti_file_hashes</list>
     <description>TI hit (Sysmon): process hash matches OpenCTI IOC</description>
   </rule>
@@ -63,8 +64,8 @@
   <!-- Sysmon EventID 15: FileCreateStreamHash -->
 
   <rule id="1305" level="16">
-    <if_group>windows</if_group>
-    <field name="win.system.eventID">15</field>
+    <if_sid>61600</if_sid>
+    <field name="win.system.eventID">^15$</field>
     <list field="win.eventdata.Hash" lookup="address_match_key">etc/lists/opencti_file_hashes</list>
     <description>TI hit (Sysmon): file stream hash matches OpenCTI IOC</description>
   </rule>
