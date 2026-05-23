@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="./logo.png" alt="Wazuh-TI Logo" width="360">
+<img src="./logo.png" alt="Wazuh-TI Logo" width="600">
 
 **Threat Intelligence ingestion pipeline for Wazuh detections**
 
