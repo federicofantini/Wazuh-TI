@@ -1,5 +1,26 @@
 # Wazuh-TI
 
+<div align="center">
+
+<img src="./logo.png" alt="Wazuh-TI Logo" width="360">
+
+**Threat Intelligence ingestion pipeline for Wazuh detections**
+
+[![GitHub tag](https://img.shields.io/github/tag/federicofantini/Wazuh-TI?include_prereleases=&sort=semver&color=blue)](https://github.com/federicofantini/Wazuh-TI/releases/)
+[![License](https://img.shields.io/badge/License-GPLv3-blue)](#license)
+[![Issues](https://img.shields.io/github/issues/federicofantini/Wazuh-TI?logo=github)](https://github.com/federicofantini/Wazuh-TI/issues)
+[![Stars](https://img.shields.io/github/stars/federicofantini/Wazuh-TI?style=flat&logo=github)](https://github.com/federicofantini/Wazuh-TI/stargazers)
+[![Forks](https://img.shields.io/github/forks/federicofantini/Wazuh-TI?style=flat&logo=github)](https://github.com/federicofantini/Wazuh-TI/forks)
+[![Last Commit](https://img.shields.io/github/last-commit/federicofantini/Wazuh-TI?logo=github)](https://github.com/federicofantini/Wazuh-TI/commits/main)
+[![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Shell](https://img.shields.io/badge/Shell-Bash-4EAA25?logo=gnubash&logoColor=white)](https://www.gnu.org/software/bash/)
+[![Wazuh](https://img.shields.io/badge/Wazuh-Threat%20Intelligence-005571)](https://wazuh.com/)
+[![OpenCTI](https://img.shields.io/badge/OpenCTI-Integration-1F6FEB)](https://www.opencti.io/)
+
+</div>
+
+---
+
 ## 0. Reference
 
 This repository serves as supplementary material for this blog post: https://blog.federicofantini.net/blog/2026/03/23/Wauh-Threat-Intelligence.html
