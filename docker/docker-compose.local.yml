@@ -1,0 +1,115 @@
+x-app-image: &app-image federicofantinihub/wazuh-ti:${APP_VERSION}
+
+x-app-environment: &app-environment
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+  DJANGO_DEBUG: ${DJANGO_DEBUG}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+  DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS}
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL}
+  DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME}
+  DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL}
+  DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD}
+  GUNICORN_WORKERS: ${GUNICORN_WORKERS}
+  GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT}
+  WAZUH_TI_EXPORT_API_TOKEN: ${WAZUH_TI_EXPORT_API_TOKEN}
+  WAZUH_TI_TAXII_URL: ${WAZUH_TI_TAXII_URL}
+  WAZUH_TI_RETROHUNT_QUEUE_EXISTING_ON_FIRST_RUN: ${WAZUH_TI_RETROHUNT_QUEUE_EXISTING_ON_FIRST_RUN}
+  WAZUH_TI_WAZUH_INDEXER_URL: ${WAZUH_TI_WAZUH_INDEXER_URL}
+  WAZUH_TI_WAZUH_INDEXER_USERNAME: ${WAZUH_TI_WAZUH_INDEXER_USERNAME}
+  WAZUH_TI_WAZUH_INDEXER_PASSWORD: ${WAZUH_TI_WAZUH_INDEXER_PASSWORD}
+  WAZUH_TI_WAZUH_INDEXER_VERIFY_TLS: ${WAZUH_TI_WAZUH_INDEXER_VERIFY_TLS}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    image: *app-image
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *app-environment
+      DJANGO_BOOTSTRAP: "true"
+    volumes:
+      - tranco_data:/var/lib/wazuh-ti/tranco
+      - static_data:/app/staticfiles
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  celery-worker:
+    image: *app-image
+    restart: unless-stopped
+    command: ["celery", "-A", "wazuh_ti", "worker", "--loglevel=INFO", "--concurrency=2"]
+    depends_on:
+      web:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *app-environment
+      DJANGO_BOOTSTRAP: "false"
+    volumes:
+      - tranco_data:/var/lib/wazuh-ti/tranco
+
+  celery-beat:
+    image: *app-image
+    restart: unless-stopped
+    command: ["celery", "-A", "wazuh_ti", "beat", "--loglevel=INFO", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    depends_on:
+      web:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *app-environment
+      DJANGO_BOOTSTRAP: "false"
+    volumes:
+      - tranco_data:/var/lib/wazuh-ti/tranco
+
+volumes:
+  postgres_data:
+  redis_data:
+  tranco_data:
+  static_data:

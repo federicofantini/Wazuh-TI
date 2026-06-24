@@ -1,0 +1,18 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+<link rel="stylesheet" href="{% static 'admin.css' %}">
+{% endblock %}
+
+{% block branding %}
+<div class="wazuh-ti-branding">
+  <img class="wazuh-ti-logo" src="{% static 'logo.png' %}" alt="Wazuh-TI logo">
+  <div class="wazuh-ti-branding-text">
+    <h1 id="site-name"><a href="{% url 'admin:index' %}">{{ site_header|default:'Wazuh-TI' }}</a></h1>
+    <div class="wazuh-ti-subtitle">OpenCTI IOC export and retro-hunting</div>
+  </div>
+</div>
+{% endblock %}

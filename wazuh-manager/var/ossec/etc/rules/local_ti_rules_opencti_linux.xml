@@ -64,7 +64,7 @@
   <!-- Useful for scans/bruteforce/web probing etc.
       In Suricata, src_ip is the remote source in inbound scenarios. -->
 
-  <rule id="1451" level="10">
+  <rule id="1451" level="16">
     <if_sid>86600</if_sid>
     <list field="src_ip" lookup="match_key">etc/lists/opencti_ips</list>
     <description>TI hit: source IP matches OpenCTI IOC</description>

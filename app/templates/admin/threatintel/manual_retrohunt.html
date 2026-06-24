@@ -1,0 +1,124 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='threatintel' %}">Threat intelligence</a>
+  &rsaquo; Manual retro-hunt
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main" class="wazuh-ti-manual-retrohunt">
+  <div class="wazuh-ti-page-heading">
+    <div>
+      <h1>Manual retro-hunt</h1>
+      <p>Run a single read-only IOC lookup against indexed Wazuh alerts. Results are stored with the same model used by scheduled retro-hunting.</p>
+    </div>
+    <a class="button wazuh-ti-secondary-button" href="{% url 'admin:threatintel_ticonfiguration_change' 1 %}">Back to configuration</a>
+  </div>
+
+  <form method="post" novalidate class="wazuh-ti-card wazuh-ti-query-card">
+    {% csrf_token %}
+    <div class="wazuh-ti-card-header">
+      <div>
+        <h2>Query parameters</h2>
+        <p>Choose the IOC type, value, lookback window, and maximum number of returned alerts.</p>
+      </div>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div class="wazuh-ti-form-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="wazuh-ti-form-grid">
+      <div class="wazuh-ti-field wazuh-ti-field-kind">
+        {{ form.kind.label_tag }}
+        {{ form.kind }}
+        {{ form.kind.errors }}
+      </div>
+      <div class="wazuh-ti-field wazuh-ti-field-value">
+        {{ form.value.label_tag }}
+        {{ form.value }}
+        {{ form.value.errors }}
+      </div>
+      <div class="wazuh-ti-field">
+        {{ form.days.label_tag }}
+        {{ form.days }}
+        {{ form.days.errors }}
+      </div>
+      <div class="wazuh-ti-field">
+        {{ form.size.label_tag }}
+        {{ form.size }}
+        {{ form.size.errors }}
+      </div>
+    </div>
+
+    <div class="wazuh-ti-submit-row">
+      <input class="default" type="submit" value="Run query">
+      <span class="wazuh-ti-submit-help">This does not modify Wazuh. It only queries the Wazuh Indexer and stores local hit metadata.</span>
+    </div>
+  </form>
+
+  {% if result %}
+    <div class="wazuh-ti-result-grid">
+      <div class="wazuh-ti-stat-card">
+        <span>Status</span>
+        <strong class="wazuh-ti-status wazuh-ti-status-{{ result.status }}">{{ result.status }}</strong>
+      </div>
+      <div class="wazuh-ti-stat-card">
+        <span>Matched alerts</span>
+        <strong>{{ result.hits }}</strong>
+      </div>
+      <div class="wazuh-ti-stat-card">
+        <span>New stored hits</span>
+        <strong>{{ result.emitted }}</strong>
+      </div>
+      <div class="wazuh-ti-stat-card">
+        <span>IOC</span>
+        <strong>{{ result.manual_kind }}: {{ result.manual_value|truncatechars:72 }}</strong>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="wazuh-ti-card wazuh-ti-runs-card">
+    <div class="wazuh-ti-card-header">
+      <div>
+        <h2>Recent manual runs</h2>
+        <p>Latest manual queries executed from this admin page.</p>
+      </div>
+      <a class="button wazuh-ti-secondary-button" href="{% url 'admin:threatintel_retrohuntrun_changelist' %}?triggered_by__exact=manual">View all</a>
+    </div>
+
+    <div class="wazuh-ti-table-wrapper">
+      <table class="wazuh-ti-run-table">
+        <thead>
+          <tr>
+            <th>Started</th>
+            <th>Status</th>
+            <th>Kind</th>
+            <th>Value</th>
+            <th>Hits</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in recent_runs %}
+            <tr>
+              <td>{{ run.started_at|date:"Y-m-d H:i:s" }}</td>
+              <td><span class="wazuh-ti-status wazuh-ti-status-{{ run.status }}">{{ run.status }}</span></td>
+              <td>{{ run.manual_kind }}</td>
+              <td class="wazuh-ti-ioc-value">{{ run.manual_value }}</td>
+              <td>{{ run.hits }}</td>
+              <td>{{ run.error|default:"-"|truncatechars:140 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="wazuh-ti-empty-state">No manual runs yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

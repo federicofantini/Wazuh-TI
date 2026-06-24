@@ -1,0 +1,315 @@
+:root {
+  --wazuh-ti-dark: #0b1726;
+  --wazuh-ti-mid: #12334f;
+  --wazuh-ti-accent: #00b7d8;
+}
+
+#header {
+  background: var(--wazuh-ti-dark);
+  color: #fff;
+}
+
+#branding h1,
+#branding h1 a:link,
+#branding h1 a:visited {
+  color: #fff;
+}
+
+.wazuh-ti-branding {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.wazuh-ti-logo {
+  border-radius: 6px;
+  height: 42px;
+  object-fit: cover;
+  width: 76px;
+}
+
+.wazuh-ti-branding-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.wazuh-ti-subtitle {
+  color: #b8eaf3;
+  font-size: 12px;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.module h2,
+.module caption,
+.inline-group h2 {
+  background: var(--wazuh-ti-mid);
+}
+
+div.breadcrumbs {
+  background: #10263b;
+}
+
+a:link,
+a:visited {
+  color: #0b6580;
+}
+
+a:hover {
+  color: #00495d;
+}
+
+.button.default,
+input[type=submit].default,
+.submit-row input.default {
+  background: #0b6580;
+}
+
+.button.default:hover,
+input[type=submit].default:hover,
+.submit-row input.default:hover {
+  background: #084d61;
+}
+
+.object-tools a:link,
+.object-tools a:visited {
+  background: #0b6580;
+}
+
+.object-tools a:hover {
+  background: #084d61;
+}
+
+@media (max-width: 767px) {
+  .wazuh-ti-logo {
+    display: none;
+  }
+
+  .wazuh-ti-subtitle {
+    display: none;
+  }
+}
+
+/* Keep admin action buttons readable in both light and dark Django themes. */
+.wazuh-ti-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wazuh-ti-action-button,
+.wazuh-ti-action-button:link,
+.wazuh-ti-action-button:visited,
+.wazuh-ti-secondary-button,
+.wazuh-ti-secondary-button:link,
+.wazuh-ti-secondary-button:visited {
+  background: #0b6580;
+  border: 0;
+  border-radius: 6px;
+  color: #fff !important;
+  display: inline-flex;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 9px 14px;
+  text-decoration: none;
+}
+
+.wazuh-ti-action-button:hover,
+.wazuh-ti-secondary-button:hover {
+  background: #084d61;
+  color: #fff !important;
+}
+
+/* Manual retro-hunt page. This is intentionally scoped to one admin page. */
+.wazuh-ti-manual-retrohunt {
+  max-width: 1180px;
+}
+
+.wazuh-ti-page-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.wazuh-ti-page-heading h1 {
+  margin-bottom: 6px;
+}
+
+.wazuh-ti-page-heading p,
+.wazuh-ti-card-header p,
+.wazuh-ti-submit-help {
+  color: var(--body-quiet-color, #666);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.wazuh-ti-card {
+  background: var(--body-bg, #fff);
+  border: 1px solid var(--hairline-color, #e8e8e8);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  margin-bottom: 22px;
+  overflow: hidden;
+}
+
+.wazuh-ti-card-header {
+  align-items: center;
+  background: var(--darkened-bg, #f8f8f8);
+  border-bottom: 1px solid var(--hairline-color, #e8e8e8);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.wazuh-ti-card-header h2 {
+  background: transparent;
+  color: var(--body-fg, #333);
+  font-size: 1rem;
+  margin: 0 0 4px;
+  padding: 0;
+}
+
+.wazuh-ti-form-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(150px, 1fr) minmax(280px, 3fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr);
+  padding: 18px;
+}
+
+.wazuh-ti-field label {
+  color: var(--body-quiet-color, #666);
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.wazuh-ti-field input,
+.wazuh-ti-field select {
+  box-sizing: border-box;
+  min-height: 38px;
+  width: 100%;
+}
+
+.wazuh-ti-field .errorlist {
+  margin: 6px 0 0;
+}
+
+.wazuh-ti-submit-row {
+  align-items: center;
+  border-top: 1px solid var(--hairline-color, #e8e8e8);
+  display: flex;
+  gap: 14px;
+  padding: 14px 18px;
+}
+
+.wazuh-ti-submit-row input.default {
+  border-radius: 6px;
+  min-width: 120px;
+  padding: 10px 16px;
+}
+
+.wazuh-ti-result-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 22px;
+}
+
+.wazuh-ti-stat-card {
+  background: var(--body-bg, #fff);
+  border: 1px solid var(--hairline-color, #e8e8e8);
+  border-left: 4px solid #0b6580;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.wazuh-ti-stat-card span {
+  color: var(--body-quiet-color, #666);
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.wazuh-ti-stat-card strong {
+  display: block;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.wazuh-ti-table-wrapper {
+  overflow-x: auto;
+}
+
+.wazuh-ti-run-table {
+  margin: 0;
+  width: 100%;
+}
+
+.wazuh-ti-run-table th,
+.wazuh-ti-run-table td {
+  vertical-align: top;
+}
+
+.wazuh-ti-ioc-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  overflow-wrap: anywhere;
+}
+
+.wazuh-ti-status {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+
+.wazuh-ti-status-success {
+  background: #0f5132;
+  color: #d1e7dd;
+}
+
+.wazuh-ti-status-failed {
+  background: #842029;
+  color: #f8d7da;
+}
+
+.wazuh-ti-status-running,
+.wazuh-ti-status-pending {
+  background: #664d03;
+  color: #fff3cd;
+}
+
+.wazuh-ti-status-skipped {
+  background: #41464b;
+  color: #e2e3e5;
+}
+
+.wazuh-ti-empty-state {
+  color: var(--body-quiet-color, #666);
+  padding: 18px !important;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .wazuh-ti-page-heading,
+  .wazuh-ti-card-header,
+  .wazuh-ti-submit-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wazuh-ti-form-grid,
+  .wazuh-ti-result-grid {
+    grid-template-columns: 1fr;
+  }
+}

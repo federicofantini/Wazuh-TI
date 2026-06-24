@@ -2,293 +2,138 @@
 
 <div align="center">
 
-<img src="./logo.png" alt="Wazuh-TI Logo" width="600">
+<img src="./app/threatintel/static/logo.png" alt="Wazuh-TI Logo" width="600">
 
-**Threat Intelligence ingestion pipeline for Wazuh detections**
+**OpenCTI ingestion and retro-hunting pipeline for Wazuh**
 
-[![GitHub tag](https://img.shields.io/github/tag/federicofantini/Wazuh-TI?include_prereleases=&sort=semver&color=blue)](https://github.com/federicofantini/Wazuh-TI/releases/)
-[![License](https://img.shields.io/badge/License-GPLv3-blue)](#license)
-[![Issues](https://img.shields.io/github/issues/federicofantini/Wazuh-TI?logo=github)](https://github.com/federicofantini/Wazuh-TI/issues)
-[![Stars](https://img.shields.io/github/stars/federicofantini/Wazuh-TI?style=flat&logo=github)](https://github.com/federicofantini/Wazuh-TI/stargazers)
-[![Forks](https://img.shields.io/github/forks/federicofantini/Wazuh-TI?style=flat&logo=github)](https://github.com/federicofantini/Wazuh-TI/forks)
-[![Last Commit](https://img.shields.io/github/last-commit/federicofantini/Wazuh-TI?logo=github)](https://github.com/federicofantini/Wazuh-TI/commits/main)
+[![License](https://img.shields.io/badge/License-GPLv3-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Shell](https://img.shields.io/badge/Shell-Bash-4EAA25?logo=gnubash&logoColor=white)](https://www.gnu.org/software/bash/)
 [![Wazuh](https://img.shields.io/badge/Wazuh-Threat%20Intelligence-005571)](https://wazuh.com/)
 [![OpenCTI](https://img.shields.io/badge/OpenCTI-Integration-1F6FEB)](https://www.opencti.io/)
 
 </div>
 
----
+Wazuh-TI is a small Django/Celery service that pulls indicators from an OpenCTI TAXII collection, maintains a current-state snapshot, exports Wazuh-ready CDB lists over HTTP, and runs retro-hunting queries against the Wazuh Indexer when new IOCs arrive. The Wazuh manager never connects to OpenCTI directly — it uses a dedicated unprivileged account to download the exported artifacts on a schedule.
 
-## 0. Reference
+Related blog post: https://blog.federicofantini.net/blog/2026/06/24/Extending-Wazuh-Threat-Intelligence-with-OpenCTI.html
 
-This repository serves as supplementary material for this blog post: https://blog.federicofantini.net/blog/2026/03/23/Wauh-Threat-Intelligence.html
+Previous post (original script-based pipeline): https://blog.federicofantini.net/blog/2026/03/23/Wazuh-Threat-Intelligence.html
 
-## 1. Overview
+## Architecture
 
-This guide explains how to deploy the full Threat Intelligence pipeline:
+```mermaid
+flowchart LR
+    OpenCTI["OpenCTI TAXII collection"] -->|"Celery fetch"| App["Django Wazuh-TI service"]
+    Tranco["Tranco cache"] --> App
+    App --> Postgres[("PostgreSQL")]
+    App --> Redis[("Redis")]
 
-- TI feed automation (Wazuh Manager)
-- CDB list integration
-- Custom detection rules
-- Suricata network telemetry (Linux agent)
-- Sysmon telemetry (Windows agent)
-- Scheduled updates via cron
+    App -->|"/opencti_*"| Downloader["opencti-ti downloader"]
+    Downloader --> Staging["/home/opencti-ti/iocs/"]
 
-This guide is operational and step-by-step. This document focuses exclusively on deployment steps.
+    Staging -->|"root cron copy"| Lists["/var/ossec/etc/lists/"]
+    Lists -->|"manager restart"| CDB["Wazuh CDB lists"]
 
-To better understand the implementation choices and how the project works, refer to this blog post: ...
+    Staging -->|"root cron append"| Events["/var/ossec/logs/opencti_retrohunt_events.json"]
+    Events -->|"localfile json"| Alerts["Wazuh alerts"]
 
-## 2. Wazuh Manager Setup
+    App -->|"retro-hunt queries"| Indexer["Wazuh Indexer"]
+    Indexer --> App
 
-All manager-side files are located under:
-
-```
-wazuh-manager/
-```
-
-### 2.1 Install the TI Update Script
-
-Copy:
-
-```
-wazuh-manager/usr/local/bin/update-ti-lists.sh
+    App --> Admin["Django Admin"]
 ```
 
-To:
+## Exported endpoints
 
-```
-/usr/local/bin/update-ti-lists.sh
-```
+The service exposes four authenticated HTTP endpoints:
 
-Set execution permissions:
+| Endpoint | Format | Consumed by |
+|---|---|---|
+| `/opencti_ips` | Wazuh CDB source list | root cron → `/var/ossec/etc/lists/opencti_ips` |
+| `/opencti_domains` | Wazuh CDB source list | root cron → `/var/ossec/etc/lists/opencti_domains` |
+| `/opencti_file_hashes` | Wazuh CDB source list | root cron → `/var/ossec/etc/lists/opencti_file_hashes` |
+| `/opencti_retrohunt_events.json` | Newline-delimited JSON | root cron appends → Wazuh localfile |
 
-```bash
-chmod +x /usr/local/bin/update-ti-lists.sh
-```
+All requests require `Authorization: Bearer <export_api_token>`. If the token field is left empty in Django Admin, all requests are accepted without authentication.
 
-Configure the env vars here: `/etc/default/wazuh-ti`
-
-```
-THREATFOX_AUTH_KEY="..."
-THREATFOX_DAYS=1
-OTX_ALIENVAULT_AUTH_KEY="..."
-OTX_DAYS_DELTA=1
-```
-
----
-
-### 2.2 Install Custom TI Rules
-
-Copy:
-
-```
-wazuh-manager/var/ossec/etc/rules/local_ti_rules_linux.xml
-wazuh-manager/var/ossec/etc/rules/local_ti_rules_windows.xml
-```
-
-To:
-
-```
-/var/ossec/etc/rules/
-```
-
-Verify permissions:
-
-```bash
-chown wazuh:wazuh /var/ossec/etc/rules/local_ti_rules_*.xml
-```
-
----
-
-### 2.3 Update Wazuh Manager ossec.conf
-
-Merge the relevant configuration from:
-
-```
-wazuh-manager/var/ossec/etc/ossec.conf
-```
-
-Into:
-
-```
-/var/ossec/etc/ossec.conf
-```
-
-Ensure the `<ruleset>` section contains:
-
-```xml
-<ruleset>
-  ...
-  <!-- TI ruleset -->
-  <list>etc/lists/threatview_cs_c2</list>
-  <list>etc/lists/threatfox_ip</list>
-  <list>etc/lists/threatfox_domain</list>
-  <list>etc/lists/et_compromised_ips</list>
-  <list>etc/lists/et_ciarmy</list>
-  <list>etc/lists/et_drop</list>
-  <list>etc/lists/et_tor</list>
-  <list>etc/lists/et_dshield</list>
-  ...
-</ruleset>
-```
-
-Adjust list names according to the output generated by `update-ti-lists.sh`.
-
----
-
-### 2.4 Configure Cron on Manager
-
-Open crontab:
-
-```bash
-crontab -e
-```
-
-Insert:
-
-```
-0  3 * * * /usr/local/bin/update-ti-lists.sh >> /var/log/wazuh-ti-update.log 2>&1
-15 3 * * * test -s /var/log/wazuh-ti-update.log && systemctl restart wazuh-manager >> /var/log/wazuh-restart.log 2>&1
-```
-
-This configuration:
-
-- Updates TI feeds daily at 03:00
-- Restarts Wazuh Manager at 03:15 only if the update produced output
-- Ensures CDB lists are recompiled and loaded correctly
-
----
-
-### 2.5 Ensure lists folder exist
-
-```bash
-mkdir -p /var/ossec/etc/lists
-chown wazuh:wazuh /var/ossec/etc/lists
-```
-
----
-
-### 2.6 Initial Restart
-
-After completing setup:
-
-```bash
-systemctl restart wazuh-manager
-```
-
-This ensures:
-
-- Custom rules are loaded
-- CDB lists are compiled
-- Detection becomes active
-
-### 2.7 OpenCTI Integration
-
-This alternative integration exports OpenCTI TAXII indicators into Wazuh CDB lists.
-
-Generated lists:
+IPv6 addresses in `/opencti_ips` are exported with quoted keys to avoid a conflict with Wazuh's `:` separator:
 
 ```text
-opencti_ips
-opencti_domains
-opencti_file_hashes
+"2001:41d0:305:2100::b6d7":opencti
 ```
 
-Final Wazuh destination:
+The retro-hunt endpoint streams `RetroHit` records as JSONL. The downloader tracks the last exported event by hash and writes only the new tail, so root cron can append idempotently.
 
-```text
-/var/ossec/etc/lists/
-```
+## Detection rules
 
-#### Install the OpenCTI fetch user
+| Rule IDs | Telemetry | Match |
+|---|---|---|
+| 1301–1305 | Sysmon (Windows) | dest IP, src IP, DNS query, process hash, file stream hash |
+| 1400–1454 | Suricata (Linux) | dest IP, src IP, DNS rrname, TLS SNI, HTTP hostname |
+| 1500 | retrohunt JSONL | `retrohunt.source=opencti` + `retrohunt.match_type=historical_ioc_match` |
 
-Create a dedicated unprivileged user:
+Rules 1400–1405 suppress common Suricata noise (STUN, SSDP, truncated packets). Rules 1450–1454 fire at level 16.
+
+## Setup
+
+### 1. Docker stack
 
 ```bash
-sudo adduser --disabled-password --gecos "" opencti-ti
-
-sudo -u opencti-ti mkdir -p /home/opencti-ti/bin
-sudo -u opencti-ti mkdir -p /home/opencti-ti/iocs
-sudo -u opencti-ti mkdir -p /home/opencti-ti/logs
+git clone https://github.com/federicofantini/Wazuh-TI.git
+cd Wazuh-TI
+cp docker/.env.example docker/.env
 ```
 
-Copy the fetch script:
+Edit `docker/.env`. Minimum required changes:
+
+```env
+DJANGO_SECRET_KEY=           # openssl rand -hex 32
+DJANGO_ALLOWED_HOSTS=        # hostname or IP of this machine
+POSTGRES_PASSWORD=
+DATABASE_URL=postgresql://wazuh_ti:<POSTGRES_PASSWORD>@postgres:5432/wazuh_ti
+DJANGO_SUPERUSER_PASSWORD=
+
+WAZUH_TI_EXPORT_API_TOKEN=   # shared secret used by the Wazuh manager downloader
+WAZUH_TI_TAXII_URL=          # OpenCTI TAXII collection URL
+WAZUH_TI_WAZUH_INDEXER_URL=
+WAZUH_TI_WAZUH_INDEXER_USERNAME=
+WAZUH_TI_WAZUH_INDEXER_PASSWORD=
+```
+
+**OpenCTI TAXII auth**: the fetch task sends only standard TAXII `Accept` headers — no separate auth header. If your OpenCTI instance requires API key authentication, embed the key as a query parameter in `WAZUH_TI_TAXII_URL` (OpenCTI supports `?api_key=<token>`).
+
+Start the stack:
 
 ```bash
-sudo cp wazuh-manager/usr/local/bin/fetch_opencti_iocs.py /home/opencti-ti/bin/fetch_opencti_iocs.py
-sudo chown opencti-ti:opencti-ti /home/opencti-ti/bin/fetch_opencti_iocs.py
-sudo chmod 750 /home/opencti-ti/bin/fetch_opencti_iocs.py
+docker compose -f docker/docker-compose.local.yml up -d --build
 ```
 
-At a minimum, configure the essential global variables in the script:
+On first start the `web` container runs migrations, bootstraps the `TiConfiguration` singleton from the env vars above, and creates the admin superuser. Existing config and credentials are not overwritten on restart.
 
-```python
-TAXII_URL = "..."
-OUTPUT_DIR = "/home/opencti-ti/iocs"
-TRANCO_DIR = "/home/opencti-ti/bin"
-```
+### 2. Configure
 
-The script extracts IPs, domains/hostnames/URL-hosts, and file hashes, applies Tranco-based filtering to the domain list, and writes the resulting indicators into the three Wazuh CDB list files.
+Open `http://<host>:8000/admin/` → **TI configuration → Wazuh-TI configuration**.
 
-Test it manually:
+The settings you are most likely to adjust beyond the initial bootstrap:
+
+- **Tranco cache** — filters Tranco-ranked popular domains before export. Enabled by default; the cache refreshes every 14 days.
+- **Retro-hunting limits** — `retrohunt_batches_per_run`, `retrohunt_iocs_per_batch`, `retrohunt_page_size`, `retrohunt_max_alerts_per_run`. The defaults are conservative; increase them if your Indexer handles the load.
+- **`retrohunt_queue_existing_on_first_run`** — if `true`, the first TAXII import queues retro-hunt jobs for the entire imported collection. Defaults to `false` (only new values after the baseline are retrohunted).
+
+The admin page also has buttons to trigger a manual TAXII fetch, process the retro-hunt queue immediately, or run a one-off retro-hunt for a single IOC.
+
+### 3. Wazuh manager: rules and ossec.conf
+
+Copy the provided rule files:
 
 ```bash
-sudo -u opencti-ti /usr/bin/python3 /home/opencti-ti/bin/fetch_opencti_iocs.py
-sudo -u opencti-ti ls -lh /home/opencti-ti/iocs/
+sudo cp wazuh-manager/var/ossec/etc/rules/local_ti_rules_opencti_linux.xml  /var/ossec/etc/rules/
+sudo cp wazuh-manager/var/ossec/etc/rules/local_ti_rules_opencti_windows.xml /var/ossec/etc/rules/
+sudo cp wazuh-manager/var/ossec/etc/rules/local_ti_rules_retrohunt.xml       /var/ossec/etc/rules/
+sudo chown wazuh:wazuh /var/ossec/etc/rules/local_ti_rules_*.xml
 ```
 
-#### Schedule OpenCTI updates
-
-Edit the `opencti-ti` crontab:
-
-```bash
-sudo crontab -u opencti-ti -e
-```
-
-Run the fetch every day:
-
-```cron
-0 3 * * * /usr/bin/python3 /home/opencti-ti/bin/fetch_opencti_iocs.py >> /home/opencti-ti/logs/fetch_opencti_iocs.log 2>&1
-```
-
-Configure log rotation:
-
-```bash
-sudo tee /etc/logrotate.d/opencti-ti >/dev/null <<'EOF'
-/home/opencti-ti/logs/fetch_opencti_iocs.log {
-    size 10M
-    rotate 4
-    compress
-    delaycompress
-    missingok
-    notifempty
-    copytruncate
-    su opencti-ti opencti-ti
-}
-EOF
-
-sudo -u opencti-ti touch /home/opencti-ti/logs/fetch_opencti_iocs.log
-```
-
-#### Copy lists into Wazuh
-
-Add a root cron job on the Wazuh Manager:
-
-```bash
-sudo crontab -e
-```
-
-Copy the generated files into Wazuh and restart the manager:
-
-```cron
-30 3,21 * * * cp /home/opencti-ti/iocs/opencti_ips /home/opencti-ti/iocs/opencti_domains /home/opencti-ti/iocs/opencti_file_hashes /var/ossec/etc/lists/ && chown wazuh:wazuh /var/ossec/etc/lists/opencti_ips /var/ossec/etc/lists/opencti_domains /var/ossec/etc/lists/opencti_file_hashes && chmod 640 /var/ossec/etc/lists/opencti_ips /var/ossec/etc/lists/opencti_domains /var/ossec/etc/lists/opencti_file_hashes && systemctl restart wazuh-manager
-```
-
-#### Register the CDB lists
-
-Add the lists to the `<ruleset>` section in `/var/ossec/etc/ossec.conf`:
+Add to the `<ruleset>` block in `/var/ossec/etc/ossec.conf`:
 
 ```xml
 <list>etc/lists/opencti_ips</list>
@@ -296,170 +141,126 @@ Add the lists to the `<ruleset>` section in `/var/ossec/etc/ossec.conf`:
 <list>etc/lists/opencti_file_hashes</list>
 ```
 
-#### Install OpenCTI rules
-
-Copy:
-
-```
-wazuh-manager/var/ossec/etc/rules/local_ti_rules_opencti_linux.xml
-wazuh-manager/var/ossec/etc/rules/local_ti_rules_opencti_windows.xml
-```
-
-To:
-
-```
-/var/ossec/etc/rules/
-```
-
-Verify permissions:
+Create the retro-hunt log file and add it as a `localfile`:
 
 ```bash
-chown wazuh:wazuh /var/ossec/etc/rules/local_ti_rules_*.xml
+sudo touch /var/ossec/logs/opencti_retrohunt_events.json
+sudo chown wazuh:wazuh /var/ossec/logs/opencti_retrohunt_events.json
+sudo chmod 640 /var/ossec/logs/opencti_retrohunt_events.json
 ```
 
-Restart the manager:
+```xml
+<localfile>
+  <location>/var/ossec/logs/opencti_retrohunt_events.json</location>
+  <log_format>json</log_format>
+</localfile>
+```
+
 ```bash
 sudo systemctl restart wazuh-manager
 ```
 
-#### Verify
+### 4. Install the downloader
 
 ```bash
+sudo adduser --disabled-password --gecos "" opencti-ti
+sudo -u opencti-ti mkdir -p /home/opencti-ti/{bin,iocs,logs}
+
+sudo cp wazuh-manager/usr/local/bin/fetch-opencti-lists-from-django.py \
+  /home/opencti-ti/bin/fetch-opencti-lists-from-django.py
+sudo chown opencti-ti:opencti-ti /home/opencti-ti/bin/fetch-opencti-lists-from-django.py
+sudo chmod 750 /home/opencti-ti/bin/fetch-opencti-lists-from-django.py
+```
+
+Edit the constants at the top of the script to match your deployment:
+
+```python
+WAZUH_TI_BASE_URL = "https://wazuh-ti.example.internal"
+WAZUH_TI_TOKEN    = "<export_api_token>"   # must match Django Admin
+INSECURE_TLS      = False                  # set True for self-signed certs
+```
+
+Test it before configuring cron:
+
+```bash
+sudo -u opencti-ti /home/opencti-ti/bin/fetch-opencti-lists-from-django.py
 sudo -u opencti-ti ls -lh /home/opencti-ti/iocs/
-sudo ls -lh /var/ossec/etc/lists/opencti_*
-sudo ls -lh /var/ossec/etc/lists/opencti_*.cdb
-sudo systemctl status wazuh-manager
-sudo /var/ossec/bin/wazuh-logtest
 ```
 
----
+The downloader validates every CDB file before staging it. An invalid line aborts the run without touching the previously staged files.
 
-## 3. Linux Agent Setup (Suricata + Wazuh Agent)
+### 5. Cron
 
-All agent-side files are located under:
+`opencti-ti` crontab — downloads fresh exports hourly:
 
+```cron
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+10 * * * * /home/opencti-ti/bin/fetch-opencti-lists-from-django.py >> /home/opencti-ti/logs/fetch.log 2>&1
 ```
-wazuh-agent/
+
+Root crontab — installs CDB lists and restarts Wazuh twice a day; appends retro-hunt events hourly:
+
+```cron
+# Install CDB lists and restart Wazuh to recompile them.
+5 6,23 * * * cp /home/opencti-ti/iocs/opencti_ips /home/opencti-ti/iocs/opencti_domains /home/opencti-ti/iocs/opencti_file_hashes /var/ossec/etc/lists/ && chown wazuh:wazuh /var/ossec/etc/lists/opencti_ips /var/ossec/etc/lists/opencti_domains /var/ossec/etc/lists/opencti_file_hashes && chmod 640 /var/ossec/etc/lists/opencti_ips /var/ossec/etc/lists/opencti_domains /var/ossec/etc/lists/opencti_file_hashes
+15 6,23 * * * systemctl restart wazuh-manager >> /var/log/wazuh-restart.log 2>&1
+
+# Append new retro-hunt events (no restart needed).
+20 * * * * test -s /home/opencti-ti/iocs/opencti_retrohunt_events.json && cat /home/opencti-ti/iocs/opencti_retrohunt_events.json >> /var/ossec/logs/opencti_retrohunt_events.json && chown wazuh:wazuh /var/ossec/logs/opencti_retrohunt_events.json && chmod 640 /var/ossec/logs/opencti_retrohunt_events.json
 ```
 
----
+The manager restart is required because CDB source lists are compiled into `.cdb` files during startup. The retro-hunt append does not need a restart — Wazuh reads JSON localfiles continuously.
 
-### 3.1 Install Suricata
+Use `cat` to append, not `cp`. Replacing the monitored file would lose events that Wazuh has not yet ingested.
 
-#### Debian / Ubuntu
+### 6. Linux agent: Suricata
+
+Install Suricata:
 
 ```bash
-sudo apt update
-sudo apt install suricata
+# Debian / Ubuntu
+sudo apt update && sudo apt install suricata
+
+# RHEL / CentOS
+sudo yum install epel-release && sudo yum install suricata
 ```
 
-#### RHEL / CentOS
+Enable and start:
 
 ```bash
-sudo yum install epel-release
-sudo yum install suricata
+sudo systemctl enable suricata
+sudo systemctl start suricata
 ```
 
-Verify installation:
+Copy the provided Suricata configuration:
 
 ```bash
-suricata --build-info
+sudo cp wazuh-agent/etc/suricata/suricata.yaml /etc/suricata/suricata.yaml
 ```
 
-Enable and start Suricata:
+Verify the configuration and confirm EVE JSON output is enabled at `/var/log/suricata/eve.json`:
 
 ```bash
-systemctl enable suricata
-systemctl start suricata
+suricata -T -c /etc/suricata/suricata.yaml -v
+sudo systemctl restart suricata
 ```
 
----
-
-### 3.2 Install Custom Suricata Configuration
-
-Copy:
-
-```
-wazuh-agent/etc/suricata/suricata.yaml
-```
-
-To:
-
-```
-/etc/suricata/suricata.yaml
-```
-
-Check the config with: `suricata -T -c /etc/suricata/suricata.yaml -v`
-
-Ensure EVE JSON output is enabled and writing to:
-
-```
-/var/log/suricata/eve.json
-```
-
-Restart Suricata:
+Install the rule update script:
 
 ```bash
-systemctl restart suricata
+sudo cp wazuh-agent/usr/local/sbin/suricata-update.sh /usr/local/sbin/suricata-update.sh
+sudo chmod +x /usr/local/sbin/suricata-update.sh
 ```
 
----
+Schedule rule updates in cron:
 
-### 3.3 Install Suricata Update Script
-
-Copy:
-
-```
-wazuh-agent/usr/local/sbin/suricata-update.sh
-```
-
-To:
-
-```
-/usr/local/sbin/suricata-update.sh
-```
-
-Set permissions:
-
-```bash
-chmod +x /usr/local/sbin/suricata-update.sh
-```
-
----
-
-### 3.4 Configure Suricata Rule Update Cron (Agent)
-
-Open crontab:
-
-```bash
-crontab -e
-```
-
-Insert:
-
-```
+```cron
 15 3,9,15,18 * * * /usr/local/sbin/suricata-update.sh
 ```
 
-This updates Suricata rules multiple times per day.
-
----
-
-### 3.5 Configure Wazuh Agent ossec.conf
-
-Copy:
-
-```
-wazuh-agent/var/ossec/etc/ossec.conf
-```
-
-Merge into:
-
-```
-/var/ossec/etc/ossec.conf
-```
-
-Ensure Suricata log collection is configured:
+Add Suricata log collection to the Wazuh agent's `ossec.conf`:
 
 ```xml
 <localfile>
@@ -468,148 +269,73 @@ Ensure Suricata log collection is configured:
 </localfile>
 ```
 
-Restart agent:
+Restart the Wazuh agent:
 
 ```bash
-systemctl restart wazuh-agent
+sudo systemctl restart wazuh-agent
 ```
 
----
+### 7. Windows agent: Sysmon
 
-## 4. Windows Agent (Sysmon)
+`wazuh-agent/sysmon/sysmonconfig.xml` contains the Sysmon configuration used in this setup.
 
-Follow the official Wazuh guide for Sysmon installation > Detection with Wazuh:
-
-https://wazuh.com/blog/detecting-process-injection-attacks-with-wazuh/
-
-In this repository:
-
-```
-wazuh-agent/sysmon/sysmonconfig.xml
-```
-
-Install Sysmon:
+Install Sysmon with it:
 
 ```powershell
 Sysmon64.exe -accepteula -i sysmonconfig.xml
 ```
 
-Ensure the Wazuh agent collects Windows Event Logs as documented in the official guide.
+Configure the Wazuh agent to collect the following Windows Event Log channels:
 
----
+| Channel | Event ID | Telemetry |
+|---|---|---|
+| `Microsoft-Windows-Sysmon/Operational` | 3 | Network connections |
+| `Microsoft-Windows-Sysmon/Operational` | 22 | DNS queries |
+| `Microsoft-Windows-Sysmon/Operational` | 1 | Process creation (hash match) |
+| `Microsoft-Windows-Sysmon/Operational` | 15 | File stream hash |
 
-## 5. Verification
+Add to the Wazuh agent's `ossec.conf`:
 
-After deployment:
+```xml
+<localfile>
+  <location>Microsoft-Windows-Sysmon/Operational</location>
+  <log_format>eventchannel</log_format>
+</localfile>
+```
 
-1. Confirm TI lists exist:
+## Verify
 
-   `ls /var/ossec/etc/lists/ | grep -vP '\.cdb$'`
-   ```bash
-   et_ciarmy
-   et_compromised_ips
-   et_drop
-   et_dshield
-   et_tor
-   ipsum_bad_ips
-   openphish_domain
-   otx_alienvault_domain
-   otx_alienvault_ip
-   threatfox_domain
-   threatfox_ip
-   threatview_cs_c2
-   ```
+Check that the CDB lists compiled after the last restart:
 
-2. Confirm CDB files are compiled:
+```bash
+sudo ls -lh /var/ossec/etc/lists/opencti_*.cdb
+```
 
-   `ls /var/ossec/etc/lists/*.cdb`
-   ```bash
-   et_ciarmy.cdb
-   et_compromised_ips.cdb
-   et_drop.cdb
-   et_dshield.cdb
-   et_tor.cdb
-   ipsum_bad_ips.cdb
-   openphish_domain.cdb
-   otx_alienvault_domain.cdb
-   otx_alienvault_ip.cdb
-   threatfox_domain.cdb
-   threatfox_ip.cdb
-   threatview_cs_c2.cdb
-   ```
+Test the retro-hunt rule:
 
-3. Check manager status:
+```bash
+sudo /var/ossec/bin/wazuh-logtest
+```
 
-   ```bash
-   systemctl status wazuh-manager
-   ```
+Paste:
 
-4. Test rule evaluation:
+```json
+{"retrohunt":{"source":"opencti","match_type":"historical_ioc_match","kind":"ip","value":"198.51.100.1","historical":{"index":"wazuh-alerts-test","document_id":"test-1","timestamp":"2026-06-13T10:00:00Z"}}}
+```
 
-   ```bash
-   /var/ossec/bin/wazuh-logtest
-   ```
+Rule 1500 should fire at level 16.
 
-5. Check the logfile: `/var/log/wazuh-ti-update.log`
+Check the downloader log and staged files:
 
-   ```
-   2026-03-07 03:00:03 Wrote /var/ossec/etc/lists/threatview_cs_c2 (1704 entries)
-   2026-03-07 03:00:08 Wrote /var/ossec/etc/lists/et_compromised_ips (1740 entries)
-   2026-03-07 03:00:14 Wrote /var/ossec/etc/lists/et_ciarmy (73986 entries)
-   2026-03-07 03:00:17 Wrote /var/ossec/etc/lists/et_drop (2779 entries)
-   2026-03-07 03:00:19 Wrote /var/ossec/etc/lists/et_tor (18210 entries)
-   2026-03-07 03:00:19 Wrote /var/ossec/etc/lists/et_dshield (74 entries)
-   2026-03-07 03:00:20 Wrote /var/ossec/etc/lists/threatfox_ip (4734 entries)
-   2026-03-07 03:00:20 Wrote /var/ossec/etc/lists/threatfox_domain (9685 entries)
-   2026-03-07 03:00:20 Fetching OTX pulses (local filter: indicators created in last 1 days)
-   2026-03-07 03:00:24 Fetched OTX pulse (size=0MB)
-   2026-03-07 03:00:24 Wrote /var/ossec/etc/lists/otx_alienvault_ip (157 entries)
-   2026-03-07 03:00:24 Wrote /var/ossec/etc/lists/otx_alienvault_domain (13480 entries)
-   2026-03-07 03:00:24 Wrote /var/ossec/etc/lists/openphish_domain (5662 entries)
-   2026-03-07 03:00:24 Wrote /var/ossec/etc/lists/ipsum_bad_ips (714593 entries)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/threatfox_ip
-   2026-03-07 03:00:24 Dedup completed for /var/ossec/etc/lists/threatfox_ip (4706 entries, removed 28)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/threatfox_domain
-   2026-03-07 03:00:24 Dedup completed for /var/ossec/etc/lists/threatfox_domain (9676 entries, removed 9)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/threatview_cs_c2
-   2026-03-07 03:00:24 Dedup completed for /var/ossec/etc/lists/threatview_cs_c2 (852 entries, removed 852)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/et_compromised_ips
-   2026-03-07 03:00:24 Dedup completed for /var/ossec/etc/lists/et_compromised_ips (1200 entries, removed 540)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/et_ciarmy
-   2026-03-07 03:00:24 Dedup completed for /var/ossec/etc/lists/et_ciarmy (60494 entries, removed 13492)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/et_drop
-   2026-03-07 03:00:24 Dedup completed for /var/ossec/etc/lists/et_drop (1556 entries, removed 1223)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/et_tor
-   2026-03-07 03:00:24 Dedup completed for /var/ossec/etc/lists/et_tor (10984 entries, removed 7226)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/et_dshield
-   2026-03-07 03:00:24 Dedup completed for /var/ossec/etc/lists/et_dshield (55 entries, removed 19)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/otx_alienvault_ip
-   2026-03-07 03:00:24 Dedup completed for /var/ossec/etc/lists/otx_alienvault_ip (157 entries, removed 0)
-   2026-03-07 03:00:24 Deduplicating /var/ossec/etc/lists/otx_alienvault_domain
-   2026-03-07 03:00:25 Dedup completed for /var/ossec/etc/lists/otx_alienvault_domain (13480 entries, removed 0)
-   2026-03-07 03:00:25 Deduplicating /var/ossec/etc/lists/openphish_domain
-   2026-03-07 03:00:25 Dedup completed for /var/ossec/etc/lists/openphish_domain (5586 entries, removed 76)
-   2026-03-07 03:00:25 Deduplicating /var/ossec/etc/lists/ipsum_bad_ips
-   2026-03-07 03:00:26 Dedup completed for /var/ossec/etc/lists/ipsum_bad_ips (509765 entries, removed 204828)
-   2026-03-07 03:00:26 Done
-   ```
+```bash
+sudo -u opencti-ti tail -n 50 /home/opencti-ti/logs/fetch.log
+sudo -u opencti-ti ls -lh /home/opencti-ti/iocs/
+```
 
-6. Generate a test event matching a known indicator.
+Check the service:
 
-If configured correctly, alerts should appear in:
-
-- Wazuh Dashboard
-- Discord (if webhook integration is configured)
-
----
-
-## 6. Final Notes
-
-This setup:
-
-- Does not modify Wazuh core
-- Uses documented CDB list and rule mechanisms
-- Can be removed cleanly
-- Can coexist with future native CTI functionality
-
-When Wazuh introduces fully integrated CTI feed management, this pipeline can be replaced or adapted accordingly.
+```bash
+docker compose -f docker/docker-compose.yml ps
+docker compose -f docker/docker-compose.yml logs web --tail=50
+docker compose -f docker/docker-compose.yml logs celery-worker --tail=50
+```

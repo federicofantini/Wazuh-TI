@@ -1,0 +1,10 @@
+Django==5.1.5
+gunicorn==23.0.0
+celery==5.4.0
+redis==5.2.1
+django-celery-beat==2.7.0
+psycopg[binary]==3.2.3
+dj-database-url==2.3.0
+whitenoise==6.8.2
+requests==2.32.3
+urllib3==2.3.0
