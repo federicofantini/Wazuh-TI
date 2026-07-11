@@ -57,7 +57,7 @@
   <rule id="1450" level="16">
     <if_sid>86600</if_sid>
     <list field="dest_ip" lookup="match_key">etc/lists/opencti_ips</list>
-    <description>TI hit: outbound destination IP matches OpenCTI IOC</description>
+    <description>TI hit: outbound destination IP $(dest_ip) matches OpenCTI IOC ($(proto))</description>
   </rule>
 
   <!-- ========= Inbound (src_ip) ========= -->
@@ -67,7 +67,7 @@
   <rule id="1451" level="16">
     <if_sid>86600</if_sid>
     <list field="src_ip" lookup="match_key">etc/lists/opencti_ips</list>
-    <description>TI hit: source IP matches OpenCTI IOC</description>
+    <description>TI hit: source IP $(src_ip) matches OpenCTI IOC ($(proto))</description>
   </rule>
 
   <!-- ========= Domains / URLs ========= -->
@@ -81,21 +81,21 @@
   <rule id="1452" level="16">
     <if_sid>86600</if_sid>
     <list field="dns.rrname" lookup="match_key">etc/lists/opencti_domains</list>
-    <description>TI hit: DNS query matches OpenCTI IOC</description>
+    <description>TI hit: DNS query $(dns.rrname) matches OpenCTI IOC</description>
   </rule>
 
   <!-- TLS SNI -->
   <rule id="1453" level="16">
     <if_sid>86600</if_sid>
     <list field="tls.sni" lookup="match_key">etc/lists/opencti_domains</list>
-    <description>TI hit: TLS SNI matches OpenCTI IOC</description>
+    <description>TI hit: TLS SNI $(tls.sni) matches OpenCTI IOC</description>
   </rule>
 
   <!-- HTTP Host header -->
   <rule id="1454" level="16">
     <if_sid>86600</if_sid>
     <list field="http.hostname" lookup="match_key">etc/lists/opencti_domains</list>
-    <description>TI hit: HTTP hostname matches OpenCTI IOC</description>
+    <description>TI hit: HTTP hostname $(http.hostname) matches OpenCTI IOC</description>
   </rule>
 
 </group>

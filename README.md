@@ -74,6 +74,12 @@ The retro-hunt endpoint streams `RetroHit` records as JSONL. The downloader trac
 
 Rules 1400–1405 suppress common Suricata noise (STUN, SSDP, truncated packets). Rules 1450–1454 fire at level 16.
 
+Rule descriptions embed the matched values with Wazuh [dynamic fields](https://documentation.wazuh.com/current/user-manual/ruleset/ruleset-xml-syntax/rules.html) (`$(field_name)`), so alert notifications show what was hit:
+
+- **Suricata**: the matched IOC (destination/source IP, DNS rrname, TLS SNI, HTTP hostname) plus the protocol for the IP rules, e.g. `TI hit: DNS query evil.example.com matches OpenCTI IOC`.
+- **Sysmon**: the matched IOC (destination IP and port, source IP, DNS query, process or file stream hash).
+- **Retro-hunt**: IOC kind and value, agent name, original rule ID, timestamp, and the names of the historical fields that matched.
+
 ## Setup
 
 ### 1. Docker stack
@@ -320,10 +326,14 @@ sudo /var/ossec/bin/wazuh-logtest
 Paste:
 
 ```json
-{"retrohunt":{"source":"opencti","match_type":"historical_ioc_match","kind":"ip","value":"198.51.100.1","historical":{"index":"wazuh-alerts-test","document_id":"test-1","timestamp":"2026-06-13T10:00:00Z"}}}
+{"retrohunt":{"source":"opencti","match_type":"historical_ioc_match","kind":"ip","value":"198.51.100.1","historical":{"index":"wazuh-alerts-test","document_id":"test-1","timestamp":"2026-06-13T10:00:00Z","agent":{"id":"001","name":"test-agent"},"rule":{"id":"5710","description":"sshd: Attempt to login using a non-existent user"},"location":"/var/log/auth.log","matched_fields":"data.srcip"}}}
 ```
 
-Rule 1500 should fire at level 16.
+Rule 1500 should fire at level 16 with the hit details expanded in the description:
+
+```text
+TI retro-hunt hit: ip 198.51.100.1 matches newly imported OpenCTI IOC (agent: test-agent, rule: 5710, time: 2026-06-13T10:00:00Z, fields: data.srcip)
+```
 
 Check the downloader log and staged files:
 

@@ -23,7 +23,7 @@
     <if_sid>61600</if_sid>
     <field name="win.system.eventID">^3$</field>
     <list field="win.eventdata.DestinationIp" lookup="match_key">etc/lists/opencti_ips</list>
-    <description>TI hit (Sysmon): outbound destination IP matches OpenCTI IOC</description>
+    <description>TI hit (Sysmon): outbound destination IP $(win.eventdata.destinationIp):$(win.eventdata.destinationPort) matches OpenCTI IOC</description>
   </rule>
 
 
@@ -34,7 +34,7 @@
     <if_sid>61600</if_sid>
     <field name="win.system.eventID">^3$</field>
     <list field="win.eventdata.SourceIp" lookup="match_key">etc/lists/opencti_ips</list>
-    <description>TI hit (Sysmon): source IP matches OpenCTI IOC</description>
+    <description>TI hit (Sysmon): source IP $(win.eventdata.sourceIp) matches OpenCTI IOC (to port $(win.eventdata.destinationPort))</description>
   </rule>
 
 
@@ -45,7 +45,7 @@
     <if_sid>61600</if_sid>
     <field name="win.system.eventID">^22$</field>
     <list field="win.eventdata.QueryName" lookup="match_key">etc/lists/opencti_domains</list>
-    <description>TI hit (Sysmon): DNS query matches OpenCTI IOC</description>
+    <description>TI hit (Sysmon): DNS query $(win.eventdata.queryName) matches OpenCTI IOC</description>
   </rule>
 
 
@@ -56,7 +56,7 @@
     <if_sid>61600</if_sid>
     <field name="win.system.eventID">^1$</field>
     <list field="win.eventdata.Hashes" lookup="address_match_key">etc/lists/opencti_file_hashes</list>
-    <description>TI hit (Sysmon): process hash matches OpenCTI IOC</description>
+    <description>TI hit (Sysmon): process hash matches OpenCTI IOC ($(win.eventdata.hashes))</description>
   </rule>
 
 
@@ -67,7 +67,7 @@
     <if_sid>61600</if_sid>
     <field name="win.system.eventID">^15$</field>
     <list field="win.eventdata.Hash" lookup="address_match_key">etc/lists/opencti_file_hashes</list>
-    <description>TI hit (Sysmon): file stream hash matches OpenCTI IOC</description>
+    <description>TI hit (Sysmon): file stream hash matches OpenCTI IOC ($(win.eventdata.hash))</description>
   </rule>
 
 </group>
