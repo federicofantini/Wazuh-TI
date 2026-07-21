@@ -51,6 +51,22 @@
     <description>Tuning: ignore noisy IPv4 truncated packet from Suricata</description>
   </rule>
 
+  <!-- Syncthing relays on 22067/tcp share IPs with Tor relays, so ET TOR fires as noise there.
+       Suppress only on that port (both directions); real Tor traffic on other ports still alerts. -->
+  <rule id="1406" level="0">
+    <if_sid>86600</if_sid>
+    <match>ET TOR Known Tor Relay/Router (Not Exit) Node Traffic</match>
+    <field name="dest_port">22067</field>
+    <description>Tuning: ignore ET TOR relay/router over Syncthing relay port</description>
+  </rule>
+
+  <rule id="1407" level="0">
+    <if_sid>86600</if_sid>
+    <match>ET TOR Known Tor Relay/Router (Not Exit) Node Traffic</match>
+    <field name="src_port">22067</field>
+    <description>Tuning: ignore ET TOR relay/router over Syncthing relay port</description>
+  </rule>
+
   <!-- ========= Outbound (dest_ip) ========= -->
   <!-- We treat "outbound" as connections from this host to external destinations.
       Suricata events generally provide src/dest IPs. -->
