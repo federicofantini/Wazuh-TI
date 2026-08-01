@@ -44,6 +44,23 @@ DOMAIN_RE = re.compile(
 )
 HEX_RE = re.compile(r"^[a-fA-F0-9]+$")
 OPENCTI_SOURCE = "opencti"
+# Special-use TLDs (RFC 6761/6762, ICANN .internal) plus the labels commonly
+# squatted on private networks. Matched on the last label, so subdomains follow.
+LOCAL_DOMAIN_TLDS = {
+    "arpa",
+    "corp",
+    "example",
+    "home",
+    "internal",
+    "intranet",
+    "invalid",
+    "lan",
+    "local",
+    "localdomain",
+    "localhost",
+    "private",
+    "test",
+}
 
 
 class DomainSuffixMatcher:
@@ -72,10 +89,14 @@ class IocStore:
     ips: set[str] = field(default_factory=set)
     domains: set[str] = field(default_factory=set)
     hashes: set[str] = field(default_factory=set)
+    local_excluded: int = 0
 
     def add_ip(self, value: Any) -> bool:
         ip_value = normalize_ip(value)
         if not ip_value:
+            return False
+        if is_local_ip(ip_value):
+            self.local_excluded += 1
             return False
         self.ips.add(ip_value)
         return True
@@ -83,6 +104,9 @@ class IocStore:
     def add_domain(self, value: Any) -> bool:
         domain = normalize_domain(value)
         if not domain:
+            return False
+        if is_local_domain(domain):
+            self.local_excluded += 1
             return False
         self.domains.add(domain)
         return True
@@ -146,6 +170,23 @@ def normalize_domain(value: Any) -> str | None:
     except UnicodeError:
         return None
     return domain if DOMAIN_RE.match(domain) else None
+
+
+def is_local_ip(value: str) -> bool:
+    """True for addresses that can only describe local or otherwise non-routable hosts.
+
+    Feeds occasionally publish indicators such as 127.0.0.1 or ``*.lan``: they match almost
+    every Wazuh alert, so they are dropped instead of flooding retro-hunting. Takes the
+    output of ``normalize_ip``, so an unparsable value is a caller bug and raises.
+    """
+    ip = ipaddress.ip_address(value)
+    # IPv4 multicast is not covered by is_global.
+    return not ip.is_global or ip.is_multicast
+
+
+def is_local_domain(value: str) -> bool:
+    """Same rationale as ``is_local_ip``, on the output of ``normalize_domain``."""
+    return value.rsplit(".", 1)[-1] in LOCAL_DOMAIN_TLDS
 
 
 def normalize_hash(value: Any) -> str | None:
@@ -552,7 +593,10 @@ def run_taxii_fetch(triggered_by: str = "scheduled", celery_task_id: str = "") -
         tranco_excluded_domains = filter_tranco_domains(iocs, matcher)
         queued = persist_iocs(config, iocs, log)
         elapsed = time.time() - started
-        log.append(f"[DONE] elapsed={elapsed:.1f}s ips={len(iocs.ips)} domains={len(iocs.domains)} hashes={len(iocs.hashes)}")
+        log.append(
+            f"[DONE] elapsed={elapsed:.1f}s ips={len(iocs.ips)} domains={len(iocs.domains)} "
+            f"hashes={len(iocs.hashes)} local_excluded={iocs.local_excluded}"
+        )
         run.status = RunStatus.SUCCESS
         run.finished_at = timezone.now()
         run.total_objects = total_objects

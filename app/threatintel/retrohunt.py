@@ -10,7 +10,7 @@ from django.db import models, transaction
 from django.utils import timezone
 from urllib3.exceptions import InsecureRequestWarning
 
-from threatintel.iocs import normalize_domain, normalize_hash, normalize_ip
+from threatintel.iocs import is_local_domain, is_local_ip, normalize_domain, normalize_hash, normalize_ip
 from threatintel.models import IocKind, RetroHit, RetroHuntRun, RetroJob, RunStatus, TiConfiguration
 
 WAZUH_TIME_FIELD = "timestamp"
@@ -19,16 +19,22 @@ MAX_ERROR_LENGTH = 2000
 
 
 def normalize_ioc(kind: str, value: str) -> str:
+    # Searching a local value matches nearly every stored alert, so a manual run is
+    # refused up front rather than filling RetroHit with noise.
     if kind == IocKind.IP:
         normalized = normalize_ip(value)
         if not normalized:
             raise ValueError(f"Invalid IP address: {value}")
+        if is_local_ip(normalized):
+            raise ValueError(f"{normalized} is a local or non-routable value and cannot be retro-hunted")
         return normalized
 
     if kind == IocKind.DOMAIN:
         normalized = normalize_domain(value)
         if not normalized:
             raise ValueError(f"Invalid domain: {value}")
+        if is_local_domain(normalized):
+            raise ValueError(f"{normalized} is a local or non-routable value and cannot be retro-hunted")
         return normalized
 
     if kind == IocKind.HASH:
